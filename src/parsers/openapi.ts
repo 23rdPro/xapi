@@ -9,12 +9,11 @@ Return a normalized OpenAPI object suitable for a normalizer.
 */
 import SwaggerParser from "@apidevtools/swagger-parser";
 import YAML from "yaml";
-
 /**
  * Parse input that may be:
- * - an already-parsed object
- * - a file path or URL string (let SwaggerParser handle)
- * - parse raw JSON/YAML string
+ * an already-parsed object
+ * a file path or URL string (let SwaggerParser handle)
+ * parse raw JSON/YAML string
  */
 export async function parseOpenAPISchema(input: any): Promise<any> {
   let schemaToDereference = input;
@@ -36,7 +35,6 @@ export async function parseOpenAPISchema(input: any): Promise<any> {
       }
     }
   }
-
   try {
     // SwaggerParser accepts object or file path/URL
     const deref = await SwaggerParser.dereference(schemaToDereference as any);
@@ -48,5 +46,4 @@ export async function parseOpenAPISchema(input: any): Promise<any> {
     );
   }
 }
-
 export default parseOpenAPISchema;

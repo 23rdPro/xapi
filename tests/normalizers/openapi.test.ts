@@ -1,5 +1,46 @@
 import { describe, it, expect } from "vitest";
 import { normalizeOpenAPISchema } from "normalizers/openapi";
+import path from "path";
+import { loadOpenAPISchema } from "loaders/openapi";
+import parseOpenAPISchema from "parsers/openapi";
+
+describe("normalizeOpenAPISchema (fixtures)", () => {
+  it("normalizes the petstore.json fixture into endpoints", async () => {
+    const fixturePath = path.resolve(__dirname, "../fixtures/petstore.json");
+    const raw = await loadOpenAPISchema(fixturePath);
+    const parsed = await parseOpenAPISchema(raw);
+    const endpoints = normalizeOpenAPISchema(parsed);
+
+    expect(endpoints.length).toBeGreaterThan(0);
+
+    // Spot check: ensure at least one known endpoint is present
+    const findByStatus = endpoints.find(
+      (e) => e.path === "/pet/findByStatus" && e.method === "get"
+    );
+    expect(findByStatus).toBeDefined();
+    expect(findByStatus?.responses.some((r) => r.status === "200")).toBe(true);
+    const anyPetGet = endpoints.find(
+      (e) => e.path.includes("/pet") && e.method === "get"
+    );
+    expect(anyPetGet).toBeDefined();
+  });
+
+  it("normalizes the petstore.yaml fixture the same as json", async () => {
+    const fixturePath = path.resolve(__dirname, "../fixtures/petstore.yaml");
+    const raw = await loadOpenAPISchema(fixturePath);
+    const parsed = await parseOpenAPISchema(raw);
+    const endpoints = normalizeOpenAPISchema(parsed);
+
+    expect(endpoints.length).toBeGreaterThan(0);
+
+    const jsonPath = path.resolve(__dirname, "../fixtures/petstore.json");
+    const rawJson = await loadOpenAPISchema(jsonPath);
+    const parsedJson = await parseOpenAPISchema(rawJson);
+    const endpointsJson = normalizeOpenAPISchema(parsedJson);
+
+    expect(endpoints).toEqual(endpointsJson);
+  });
+});
 
 describe("normalizeOpenAPISchema — high ROI behaviours", () => {
   it("merges path-level and operation-level parameters, letting operation override", () => {

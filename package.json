@@ -10,7 +10,8 @@
     "prepare": "husky install",
     "lint": "eslint ./src --ext .ts",
     "format": "prettier --check .",
-    "format:fix": "prettier --write ."
+    "format:fix": "prettier --write .",
+    "xapi:generate": "tsx ./scripts/generate.ts"
   },
   "keywords": [],
   "author": "Olumide Bakare",
@@ -25,6 +26,7 @@
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
+    "json-schema-to-typescript": "^15.0.4",
     "lint-staged": "^16.1.4",
     "prettier": "^3.6.2",
     "tsconfig-paths": "^4.2.0",
@@ -33,12 +35,32 @@
     "typescript-eslint": "^8.39.0",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4",
-    "yaml": "^2.8.1"
+    "yaml": "^2.8.1",
+    "zod": "^4.0.17"
   },
   "lint-staged": {
     "**/*.{js,ts,tsx}": "eslint --fix"
   },
   "dependencies": {
-    "@apidevtools/swagger-parser": "^12.0.0"
+    "@apidevtools/swagger-parser": "^12.0.0",
+    "@reduxjs/toolkit": "^2.8.2",
+    "@tanstack/react-query": "^5.85.5",
+    "axios": "^1.11.0"
+  },
+  "peerDependencies": {
+    "axios": "^1.11.0",
+    "@tanstack/react-query": "^5.85.5",
+    "@reduxjs/toolkit": "^2.8.2"
+  },
+  "peerDependenciesMeta": {
+    "axios": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "@reduxjs/toolkit": {
+      "optional": true
+    }
   }
 }

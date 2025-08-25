@@ -1,18 +1,5 @@
 import path from "node:path";
 
-// export function getExtension(filePath: string) {
-//   return path.extname(new URL(filePath, "file://").pathname).toLowerCase();
-// }
-
-// export function isUrl(str: string) {
-//   try {
-//     new URL(str);
-//     return true;
-//   } catch {
-//     return false;
-//   }
-// }
-
 export function isUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }

@@ -36,3 +36,58 @@ export type Endpoint = {
   requestBody?: Body;
   responses: Response[];
 };
+
+export const sampleEndpoints: Endpoint[] = [
+  {
+    id: "getPet",
+    name: "getPet",
+    method: "get",
+    path: "/pet/{petId}",
+    params: [
+      {
+        name: "petId",
+        in: "path",
+        required: true,
+        schema: { type: "string" },
+      },
+    ],
+    responses: [
+      {
+        status: "200",
+        contentType: "application/json",
+        schema: { type: "object", properties: { id: { type: "string" } } },
+      },
+    ],
+  },
+  {
+    id: "updatePet",
+    name: "updatePet",
+    method: "post",
+    path: "/pet/{petId}",
+    params: [
+      {
+        name: "petId",
+        in: "path",
+        required: true,
+        schema: { type: "string" },
+      },
+    ],
+    requestBody: {
+      contentType: "application/json",
+      schema: {
+        type: "object",
+        properties: { name: { type: "string" } },
+      },
+    },
+    responses: [
+      {
+        status: "200",
+        contentType: "application/json",
+        schema: {
+          type: "object",
+          properties: { success: { type: "boolean" } },
+        },
+      },
+    ],
+  },
+];

@@ -22,5 +22,5 @@ describe("loadOpenAPISchema", () => {
     const schema = await loadOpenAPISchema(url);
     expect(schema).toHaveProperty("openapi");
     expect(schema).toHaveProperty("paths");
-  });
+  }, 20000);
 });

@@ -18,8 +18,9 @@
       "normalizers/*": ["normalizers/*"],
       "parsers/*": ["parsers/*"],
       "types/*": ["types/*"],
+      "scripts/*": ["scripts/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist", ".husky"]
 }

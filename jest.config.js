@@ -4,5 +4,6 @@ module.exports = {
     "^loaders/(.*)$": "<rootDir>/src/loaders/$1",
     "^parsers/(.*)$": "<rootDir>/src/parsers/$1",
     "^types/(.*)$": "<rootDir>/src/types/$1",
+    "^scripts/(.*)$": "<rootDir>/scripts/$1"
   },
 };
