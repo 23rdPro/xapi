@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { generateClient } from "generators/client";
-import { sampleEndpoints, type Endpoint } from "types/endpoint";
+import { generateClient, generateGraphQLClient } from "generators/client";
+import {
+  type GraphQLEndpoint,
+  sampleEndpoints,
+  type Endpoint,
+} from "types/endpoint";
 
 describe("generateClient", () => {
   it("generates a fetch-based client function by default", async () => {
@@ -77,5 +81,63 @@ describe("generateClient", () => {
     expect(code).toContain("useQuery");
     expect(code).toContain("export function useGetPet");
     expect(code).not.toContain("export async function getPet");
+  });
+});
+
+const sampleGraphQLEndpoints: GraphQLEndpoint[] = [
+  {
+    operationType: "query",
+    operationName: "getUsers",
+    rawDocument: `query GetUsers { users { id name } }`,
+  },
+  {
+    operationType: "mutation",
+    operationName: "createUser",
+    rawDocument: `mutation CreateUser($name: String!) { createUser(name: $name) { id name } }`,
+  },
+  {
+    operationType: "subscription",
+    operationName: "userAdded",
+    rawDocument: `subscription UserAdded { userAdded { id name } }`,
+  },
+];
+
+describe("generateGraphQLClient", () => {
+  it("generates a GraphQLClient with fetch request", async () => {
+    const code = await generateGraphQLClient(sampleGraphQLEndpoints, {
+      baseUrl: "https://api.test/graphql",
+    });
+
+    expect(code).toContain("export class GraphQLClient");
+    expect(code).toContain(`"https://api.test/graphql"`);
+    expect(code).toContain("fetch(this.url");
+  });
+
+  it("generates a GraphQLWebSocketClient for subscriptions", async () => {
+    const code = await generateGraphQLClient(sampleGraphQLEndpoints, {
+      wsUrl: "ws://localhost:4000/graphql",
+    });
+
+    expect(code).toContain("export class GraphQLWebSocketClient");
+    expect(code).toContain("new WebSocket(");
+    expect(code).toContain("connection_init");
+  });
+
+  it("generates query helpers", async () => {
+    const code = await generateGraphQLClient(sampleGraphQLEndpoints);
+    expect(code).toContain("export async function GetUsersQuery");
+    expect(code).toContain("client.request");
+  });
+
+  it("generates mutation helpers", async () => {
+    const code = await generateGraphQLClient(sampleGraphQLEndpoints);
+    expect(code).toContain("export async function CreateUserMutation");
+    expect(code).toContain("client.request");
+  });
+
+  it("generates subscription helpers", async () => {
+    const code = await generateGraphQLClient(sampleGraphQLEndpoints);
+    expect(code).toContain("export function UserAddedSubscription");
+    expect(code).toContain("client.subscribe");
   });
 });

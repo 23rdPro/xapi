@@ -1,5 +1,5 @@
 // Take the raw OpenAPI object and produce a uniform list of endpoints
-// makes it easy to plug into type generation and client code generation.
+// easy to plug into type generation and client code generation.
 import type { Endpoint, Body, Response } from "types/endpoint";
 import {
   HTTP_METHODS,

@@ -18,7 +18,9 @@
       "normalizers/*": ["normalizers/*"],
       "parsers/*": ["parsers/*"],
       "types/*": ["types/*"],
-      "scripts/*": ["scripts/*"]
+      "scripts/*": ["scripts/*"],
+      "core/*": ["core/*"],
+      "plugins/*": ["plugins/*"],
     }
   },
   "include": ["src/**/*", "tests/**/*", "scripts/**/*"],

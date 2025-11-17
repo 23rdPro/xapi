@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { generateTypes } from "generators/typescript";
-import type { Endpoint } from "types/endpoint";
+import { generateGraphQLTypes, generateTypes } from "generators/typescript";
+import type { Endpoint, GraphQLEndpoint } from "types/endpoint";
 
 describe("generateTypes", () => {
   it("generates request and response types for simple endpoints", async () => {
@@ -71,5 +71,55 @@ describe("generateTypes with zod", () => {
     expect(out).toContain(`import { z } from "zod"`);
     expect(out).toMatch(/ResponseSchema/);
     expect(out).toContain("z.object");
+  });
+});
+
+describe("generateGraphQLTypes", () => {
+  it("generates types for GraphQL endpoints with schemas", async () => {
+    const endpoints: GraphQLEndpoint[] = [
+      {
+        operationName: "GetUser",
+        operationType: "query",
+        requestSchema: {
+          type: "object",
+          properties: { id: { type: "string" } },
+          required: ["id"],
+        },
+        responseSchema: {
+          type: "object",
+          properties: {
+            user: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    ];
+    const out = await generateGraphQLTypes(endpoints, { prefix: "GQL" });
+
+    expect(out).toContain("export type GQLGetUserRequest");
+    expect(out).toContain("export type GQLGetUserResponse");
+  });
+
+  it("handles endpoints without request schema", async () => {
+    const endpoints: GraphQLEndpoint[] = [
+      {
+        operationName: "ListUsers",
+        operationType: "query",
+        requestSchema: undefined,
+        responseSchema: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+    ];
+
+    const out = await generateGraphQLTypes(endpoints);
+    expect(out).toContain("export type GQLListUsersResponse");
+    expect(out).toContain("Request = void;");
   });
 });

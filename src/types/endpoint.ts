@@ -25,6 +25,14 @@ export type Response = {
   schema?: any;
 };
 
+export type GraphQLEndpoint = {
+  operationType: "query" | "mutation" | "subscription";
+  operationName: string;
+  requestSchema?: any;
+  responseSchema?: any;
+  rawDocument?: string;
+};
+
 export type Endpoint = {
   id: string;
   name: string;
@@ -35,6 +43,7 @@ export type Endpoint = {
   params: Param[]; // combined path + query + header
   requestBody?: Body;
   responses: Response[];
+  graphql?: GraphQLEndpoint;
 };
 
 export const sampleEndpoints: Endpoint[] = [

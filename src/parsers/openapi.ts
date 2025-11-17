@@ -12,7 +12,7 @@ import YAML from "yaml";
 /**
  * Parse input that may be:
  * an already-parsed object
- * a file path or URL string (let SwaggerParser handle)
+ * a file path or URL string (SwaggerParser)
  * parse raw JSON/YAML string
  */
 export async function parseOpenAPISchema(input: any): Promise<any> {

@@ -5,13 +5,9 @@
 // and tanstack
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { Endpoint } from "types/endpoint";
+import type { Endpoint, GraphQLEndpoint } from "types/endpoint";
 import type { ClientGenOptions } from "types/generators";
-import { capitalize } from "utils/generators";
-
-function makePathTemplate(ep: Endpoint): string {
-  return "`" + ep.path.replace(/{(.*?)}/g, "${params.$1}") + "`";
-}
+import { capitalize, makePathTemplate, toApiError } from "utils/generators";
 
 export async function generateClient(
   endpoints: Endpoint[],
@@ -22,26 +18,23 @@ export async function generateClient(
   lines.push("");
   lines.push(`import type {`);
   for (const ep of endpoints) {
-    const funcName = ep.name;
-    const paramsType = `${capitalize(funcName)}Params`;
-    const respType = `${capitalize(funcName)}Response`;
+    const funcName = capitalize(ep.name);
+    const paramsType = `${funcName}Params`;
+    const respType = `${funcName}Response`;
     lines.push(`  ${paramsType},`);
     lines.push(`  ${respType},`);
   }
-  lines.push(`} from "./types";`);
-  lines.push("");
+  lines.push(`} from "./types";\n`);
   const baseUrl = opts.baseUrl ?? "";
   lines.push(`const BASE_URL = "${baseUrl}";`);
   lines.push("");
   // add ApiError type
   lines.push(
-    `export interface ApiError extends Error { status: number; body?: any }`
+    `export interface ApiError extends Error { status: number; body?: any }\n`
   );
-  lines.push("");
   switch (opts.httpLibrary) {
     case "axios":
-      lines.push(`import axios from "axios";`);
-      lines.push("");
+      lines.push(`import axios from "axios";\n`);
       lines.push(`export const client = {`);
       lines.push(
         `  async request<T>(opts: { method: string; path: string; body?: any }): Promise<T> {`
@@ -52,20 +45,15 @@ export async function generateClient(
       );
       lines.push(`      return res.data;`);
       lines.push(`    } catch (e: any) {`);
-      lines.push(`      const err = new Error(e.message) as ApiError;`);
-      lines.push(`      err.status = e.response?.status ?? 500;`);
-      lines.push(`      err.body = e.response?.data;`);
-      lines.push(`      throw err;`);
+      lines.push(toApiError("e"));
       lines.push(`    }`);
       lines.push(`  }`);
       lines.push(`};`);
       break;
     case "rtk":
       lines.push(
-        `import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";`
+        `import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";\n`
       );
-
-      lines.push("");
       lines.push(`export const api = createApi({`);
       lines.push(`  reducerPath: "xapi",`);
       lines.push(`  baseQuery: fetchBaseQuery({ baseUrl: BASE_URL }),`);
@@ -107,9 +95,8 @@ export async function generateClient(
       break;
     case "tanstack":
       lines.push(
-        `import { useQuery, useMutation } from "@tanstack/react-query";`
+        `import { useQuery, useMutation } from "@tanstack/react-query";\n`
       );
-      lines.push("");
       lines.push(
         `async function rawRequest<T>(opts: { method: string; path: string; body?: any }): Promise<T> {`
       );
@@ -146,7 +133,6 @@ export async function generateClient(
             // params required
             lines.push(`export function ${hookName}(params: ${paramsType}) {`);
           } else {
-            // no params
             lines.push(`export function ${hookName}() {`);
           }
 
@@ -238,4 +224,150 @@ export async function generateClient(
     await fs.writeFile(dest, out, "utf8");
   }
   return out;
+}
+export async function generateGraphQLClient(
+  endpoints: GraphQLEndpoint[],
+  opts: {
+    outputPath?: string;
+    baseUrl?: string;
+    wsUrl?: string;
+    zod?: boolean;
+    prefix?: string;
+  } = {}
+): Promise<string> {
+  const baseUrl = opts.baseUrl ?? "/graphql";
+  const wsUrl = opts.wsUrl ?? "ws://localhost:4000/graphql";
+  const prefix = opts.prefix ?? "GQL";
+
+  let output = `// Auto-generated GraphQL client by xapi\n\n`;
+  output += `import { ${endpoints
+    .map((ep) => {
+      const opName = capitalize(ep.operationName);
+      return `${prefix}${opName}Request, ${prefix}${opName}Response${
+        opts.zod
+          ? `, ${prefix}${opName}RequestSchema, ${prefix}${opName}ResponseSchema`
+          : ""
+      }`;
+    })
+    .join(",\n  ")} } from "./types";\n\n`;
+  // core client class
+  output += `export class GraphQLClient {
+    constructor(private url: string = "${baseUrl}") {}
+
+    async request<TData, TVariables = Record<string, any>>(
+      query: string,
+      variables?: TVariables
+    ): Promise<TData> {
+      const res = await fetch(this.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables }),
+      });
+      if (!res.ok) throw new Error(\`GraphQL request failed: \${res.status}\`);
+      const json = await res.json();
+      if (json.errors) throw new Error(JSON.stringify(json.errors));
+      return json.data as TData;
+    }
+  }\n\n`;
+  // ---- WS subscription client ----
+  output += `export class GraphQLWebSocketClient {
+    private socket: WebSocket;
+    private idCounter = 1;
+    private subscriptions = new Map<number, (data: any) => void>();
+
+    constructor(url: string = "${wsUrl}") {
+      this.socket = new WebSocket(url, "graphql-ws");
+      this.socket.onopen = () => {
+        this.socket.send(JSON.stringify({ type: "connection_init" }));
+      };
+      this.socket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.id && this.subscriptions.has(Number(msg.id))) {
+          this.subscriptions.get(Number(msg.id))?.(msg.payload.data);
+        }
+      };
+    }
+    subscribe(query: string, onData: (data: any) => void, variables?: Record<string, any> | undefined) {
+      const id = this.idCounter++;
+      this.subscriptions.set(id, onData);
+      this.socket.send(JSON.stringify({
+        id: String(id),
+        type: "start",
+        payload: { query, variables },
+      }));
+      return () => {
+        this.socket.send(JSON.stringify({ id: String(id), type: "stop" }));
+        this.subscriptions.delete(id);
+      };
+    }
+  }\n\n`;
+  // generate per-operation helpers
+  for (const ep of endpoints) {
+    const fnName = capitalize(ep.operationName);
+    const queryDoc = ep.rawDocument?.trim() ?? "";
+    const reqType = `${prefix}${fnName}Request`;
+    const resType = `${prefix}${fnName}Response`;
+    const reqSchema = `${reqType}Schema`;
+    const resSchema = `${resType}Schema`;
+    if (ep.operationType === "query" || ep.operationType === "mutation") {
+      const kind = ep.operationType === "query" ? "Query" : "Mutation";
+      if (opts.zod) {
+        output += `export async function ${fnName}${kind}Validated(
+          client: GraphQLClient,
+          variables?: ${reqType}
+        ): Promise<${resType}> {
+          ${reqSchema}.parse(variables);
+          const query = \`${queryDoc}\`;
+          const data = await client.request<${resType}, ${reqType}>(query, variables);
+          return ${resSchema}.parse(data);
+        }\n\n`;
+      }
+      output += `export async function ${fnName}${kind}(
+        client: GraphQLClient,
+        variables?: ${reqType}
+      ): Promise<${resType}> {
+        const query = \`${queryDoc}\`;
+        return client.request<${resType}, ${reqType}>(query, variables);
+      }\n\n`;
+    }
+    if (ep.operationType === "subscription") {
+      const hasVars = !!ep.requestSchema;
+      if (opts.zod && hasVars) {
+        output += `export function ${fnName}SubscriptionValidated(
+          client: GraphQLWebSocketClient,
+          variables: ${reqType},
+          onData: (data: ${resType}) => void
+        ) {
+          ${reqSchema}.parse(variables);
+          const query = \`${queryDoc}\`;
+          return client.subscribe(query, variables, (raw) => {
+            onData(${resSchema}.parse(raw));
+          });
+        }\n\n`;
+      }
+      if (hasVars) {
+        output += `export function ${fnName}Subscription(
+          client: GraphQLWebSocketClient,
+          variables: ${reqType},
+          onData: (data: ${resType}) => void
+        ) {
+          const query = \`${queryDoc}\`;
+          return client.subscribe(query, variables, onData);
+        }\n\n`;
+      } else {
+        output += `export function ${fnName}Subscription(
+          client: GraphQLWebSocketClient,
+          onData: (data: ${resType}) => void
+        ) {
+          const query = \`${queryDoc}\`;
+          return client.subscribe(query, onData);
+        }\n\n`;
+      }
+    }
+  }
+  if (opts.outputPath) {
+    const full = path.resolve(opts.outputPath);
+    await fs.writeFile(full, output, "utf8");
+  }
+  return output;
 }

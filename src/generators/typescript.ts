@@ -3,7 +3,7 @@
 // + JSDoc comments for better DX
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { Endpoint } from "types/endpoint";
+import type { Endpoint, GraphQLEndpoint } from "types/endpoint";
 import type { TSGenOptions } from "types/generators";
 import {
   makeTypeName,
@@ -30,14 +30,15 @@ export async function generateTypes(
   // track declared/exported names to avoid duplicates
   const declaredNames = new Set<string>();
   // schemaHash -> exportedName (so same schema reuses the same declaration)
-  const schemaMap = new Map<string, string>();
-  function uniqueName(base: string) {
+  // schemaKey -> { tsName, zodName? }
+  const schemaMap = new Map<string, { tsName: string; zodName?: string }>();
+  function uniqueName(base: string, declared: Set<string>) {
     let name = base;
     let i = 1;
-    while (declaredNames.has(name)) {
+    while (declared.has(name)) {
       name = `${base}_${i++}`;
     }
-    declaredNames.add(name);
+    declared.add(name);
     return name;
   }
   // stable stringify for schema hashing (sorts object keys)
@@ -54,6 +55,49 @@ export async function generateTypes(
       return out;
     }
     return JSON.stringify(_stringify(obj));
+  }
+
+  async function emitSchema(
+    schema: any,
+    baseName: string,
+    opts: { needZod: boolean },
+    lines: string[],
+    schemaMap: Map<string, { tsName: string; zodName?: string }>,
+    declaredNames: Set<string>
+  ): Promise<{ tsName: string; zodName?: string }> {
+    if (!schema) {
+      return { tsName: "any", zodName: opts.needZod ? "z.any()" : undefined };
+    }
+    const schemaKey = stableStringify(schema);
+    const cached = schemaMap.get(schemaKey);
+    if (cached) return cached;
+    const candidateName = uniqueName(baseName, declaredNames);
+    let tsName = candidateName;
+    let zodName: string | undefined;
+
+    const { code, exportedName } = await jsonSchemaToTS(schema, candidateName);
+    if (code) {
+      lines.push(code.trim());
+      tsName = exportedName ?? candidateName;
+    } else {
+      // fallback simple mapping
+      const ts = simpleSchemaToTS(schema, candidateName);
+      lines.push(`export type ${candidateName} = ${ts};`);
+      tsName = candidateName;
+    }
+    if (opts.needZod) {
+      const zodVar = makeTypeName(tsName, "Schema");
+      const zodCode = schemaToZodCode(schema, zodVar);
+      lines.push(`export const ${zodVar} = ${zodCode};`);
+      lines.push(
+        `export type ${makeTypeName(tsName, "Parsed")} = z.infer<typeof ${zodVar}>;`
+      );
+      zodName = zodVar;
+    }
+    const result = { tsName, zodName };
+    schemaMap.set(schemaKey, result);
+    declaredNames.add(tsName);
+    return result;
   }
   for (const ep of endpoints) {
     const baseRaw = opts.prefix ? `${opts.prefix}_${ep.name}` : ep.name;
@@ -78,91 +122,36 @@ export async function generateTypes(
         propsObj.properties[p.name] = p.schema || { type: "any" };
         if (p.required) propsObj.required.push(p.name);
       }
-      const schemaKey = stableStringify(propsObj);
-      let exportedForSchema = schemaMap.get(schemaKey);
-      // Try json-schema-to-typescript first
-      // give json-schema-to-typescript a unique candidate name
-      if (!exportedForSchema) {
-        const candidateName = uniqueName(paramsTypeName);
-        const { code: paramsCode, exportedName: paramsExported } =
-          await jsonSchemaToTS(propsObj, candidateName);
-        if (paramsCode) {
-          lines.push(paramsCode.trim());
-          const realExport = paramsExported ?? candidateName;
-          schemaMap.set(schemaKey, realExport);
-          // if compiled exported with a different name from conventional, create alias
-          if (
-            realExport !== paramsTypeName &&
-            !declaredNames.has(paramsTypeName)
-          ) {
-            lines.push(`export type ${paramsTypeName} = ${realExport};`);
-            declaredNames.add(paramsTypeName);
-          } else {
-            declaredNames.add(realExport);
-          }
-          exportedForSchema = realExport;
-        } else {
-          // fallback to simple
-          const candidateName = uniqueName(paramsTypeName);
-          const ts = simpleSchemaToTS(propsObj, candidateName);
-          lines.push(`export type ${paramsTypeName} = ${ts};`);
-          schemaMap.set(schemaKey, paramsTypeName);
-          declaredNames.add(paramsTypeName);
-          exportedForSchema = paramsTypeName;
-        }
-      } else {
-        // previously generated identical schema; create alias if needed
-        if (exportedForSchema !== paramsTypeName) {
-          if (!declaredNames.has(paramsTypeName)) {
-            lines.push(`export type ${paramsTypeName} = ${exportedForSchema};`);
-            declaredNames.add(paramsTypeName);
-          }
-        }
+      const { tsName } = await emitSchema(
+        propsObj,
+        paramsTypeName,
+        { needZod },
+        lines,
+        schemaMap,
+        declaredNames
+      );
+      if (tsName !== paramsTypeName) {
+        lines.push(`export type ${paramsTypeName} = ${tsName};`);
       }
     } else {
       lines.push(`export type ${paramsTypeName} = void;`);
-      declaredNames.add(paramsTypeName);
     }
     // request body
     const bodyTypeName = `${TypeBase}Body`;
     if (ep.requestBody && (ep.requestBody as any).schema) {
-      const schema = (ep.requestBody as any).schema;
-      const schemaKey = stableStringify(schema);
-      let exportedForSchema = schemaMap.get(schemaKey);
-      if (!exportedForSchema) {
-        const candidateName = uniqueName(bodyTypeName);
-        const { code: bodyCode, exportedName: bodyExported } =
-          await jsonSchemaToTS(schema, candidateName);
-        if (bodyCode) {
-          lines.push(bodyCode.trim());
-          const realExport = bodyExported ?? candidateName;
-          schemaMap.set(schemaKey, realExport);
-          if (realExport !== bodyTypeName && !declaredNames.has(bodyTypeName)) {
-            lines.push(`export type ${bodyTypeName} = ${realExport};`);
-            declaredNames.add(bodyTypeName);
-          } else {
-            declaredNames.add(realExport);
-          }
-          exportedForSchema = realExport;
-        } else {
-          const candidateName = uniqueName(bodyTypeName);
-          const ts = simpleSchemaToTS(schema, candidateName);
-          lines.push(`export type ${bodyTypeName} = ${ts};`);
-          schemaMap.set(schemaKey, bodyTypeName);
-          declaredNames.add(bodyTypeName);
-          exportedForSchema = bodyTypeName;
-        }
-      } else {
-        if (exportedForSchema !== bodyTypeName) {
-          if (!declaredNames.has(bodyTypeName)) {
-            lines.push(`export type ${bodyTypeName} = ${exportedForSchema};`);
-            declaredNames.add(bodyTypeName);
-          }
-        }
+      const { tsName } = await emitSchema(
+        (ep.requestBody as any).schema,
+        bodyTypeName,
+        { needZod },
+        lines,
+        schemaMap,
+        declaredNames
+      );
+      if (tsName !== bodyTypeName) {
+        lines.push(`export type ${bodyTypeName} = ${tsName};`);
       }
     } else {
       lines.push(`export type ${bodyTypeName} = void;`);
-      declaredNames.add(bodyTypeName);
     }
     // Composite Request
     lines.push(
@@ -172,53 +161,21 @@ export async function generateTypes(
     const respTypeName = `${TypeBase}Response`;
     const pref =
       (ep as any).preferredResponse || (ep.responses && ep.responses[0]);
-    if (pref && (pref as any).schema) {
-      const schema = (pref as any).schema;
-      const schemaKey = stableStringify(schema);
-      let exportedForSchema = schemaMap.get(schemaKey);
-      if (!exportedForSchema) {
-        const candidateName = uniqueName(respTypeName);
-        const { code: respCode, exportedName: respExported } =
-          await jsonSchemaToTS(schema, candidateName);
-        if (respCode) {
-          lines.push(respCode.trim());
-          const realExport = respExported ?? candidateName;
-          schemaMap.set(schemaKey, realExport);
-          if (realExport !== respTypeName && !declaredNames.has(respTypeName)) {
-            lines.push(`export type ${respTypeName} = ${realExport};`);
-            declaredNames.add(respTypeName);
-          } else {
-            declaredNames.add(realExport);
-          }
-          exportedForSchema = realExport;
-        } else {
-          const candidateName = uniqueName(respTypeName);
-          const ts = simpleSchemaToTS(schema, candidateName);
-          lines.push(`export type ${respTypeName} = ${ts};`);
-          schemaMap.set(schemaKey, respTypeName);
-          declaredNames.add(respTypeName);
-          exportedForSchema = respTypeName;
-        }
-      } else {
-        if (exportedForSchema !== respTypeName) {
-          if (!declaredNames.has(respTypeName)) {
-            lines.push(`export type ${respTypeName} = ${exportedForSchema};`);
-            declaredNames.add(respTypeName);
-          }
-        }
-      }
-      // Add Zod (optional)
-      if (needZod) {
-        const zodCode = schemaToZodCode(schema, `${TypeBase}Response`);
-        lines.push(
-          `export const ${makeTypeName(TypeBase, "ResponseSchema")} = ${zodCode};`
-        );
-        lines.push(
-          `export type ${makeTypeName(TypeBase, "ResponseParsed")} = z.infer<typeof ${makeTypeName(TypeBase, "ResponseSchema")}>;`
-        );
+    if (pref && (pref as any)?.schema) {
+      const { tsName } = await emitSchema(
+        (pref as any).schema,
+        respTypeName,
+        { needZod },
+        lines,
+        schemaMap,
+        declaredNames
+      );
+      if (tsName !== respTypeName) {
+        lines.push(`export type ${respTypeName} = ${tsName};`);
       }
     } else {
       lines.push(`export type ${respTypeName} = any;`);
+      // Add Zod (optional)
       if (needZod) {
         lines.push(
           `export const ${makeTypeName(TypeBase, "ResponseSchema")} = z.any();`
@@ -227,7 +184,6 @@ export async function generateTypes(
           `export type ${makeTypeName(TypeBase, "ResponseParsed")} = any;`
         );
       }
-      declaredNames.add(respTypeName);
     }
     lines.push("");
   }
@@ -236,6 +192,59 @@ export async function generateTypes(
     const dest = path.resolve(opts.outputPath);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, out, "utf8");
+  }
+  return out;
+}
+/**
+ * Generate GraphQL request/response types (and optional Zod schemas).
+ * @param endpoints - Normalized GraphQL endpoints
+ * @param opts - Options for generation
+ * @returns Generated TypeScript string
+ */
+export async function generateGraphQLTypes(
+  endpoints: GraphQLEndpoint[],
+  opts: { outputPath?: string; prefix?: string; zod?: boolean } = {}
+): Promise<string> {
+  const prefix = opts.prefix ?? "GQL";
+  let out = `// Auto-generated GraphQL types by xapi\n\n`;
+
+  for (const ep of endpoints) {
+    const opName = capitalize(ep.operationName);
+
+    if (ep.requestSchema) {
+      const reqTypeName = `${prefix}${opName}Request`;
+      out += `export type ${reqTypeName} = ${simpleSchemaToTS(
+        ep.requestSchema,
+        reqTypeName
+      )};\n\n`;
+      if (opts.zod) {
+        out += `export const ${reqTypeName}Schema = ${schemaToZodCode(
+          ep.requestSchema,
+          reqTypeName
+        )};\n\n`;
+      }
+    } else {
+      out += `export type ${prefix}${opName}Request = void;\n\n`;
+    }
+    if (ep.responseSchema) {
+      const resTypeName = `${prefix}${opName}Response`;
+      out += `export type ${resTypeName} = ${simpleSchemaToTS(
+        ep.responseSchema,
+        resTypeName
+      )};\n\n`;
+      if (opts.zod) {
+        out += `export const ${resTypeName}Schema = ${schemaToZodCode(
+          ep.responseSchema,
+          resTypeName
+        )};\n\n`;
+      }
+    } else {
+      out += `export type ${prefix}${opName}Response = any;\n\n`;
+    }
+  }
+  if (opts.outputPath) {
+    const full = path.resolve(opts.outputPath);
+    await fs.writeFile(full, out, "utf8");
   }
   return out;
 }
