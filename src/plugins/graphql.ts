@@ -6,7 +6,7 @@ import { normalizeGraphQLSchema } from "normalizers/graphql";
 
 export const graphqlPlugin: CodegenPlugin = {
   name: "graphql",
-  match(file, options?) {
+  match(file) {
     return (
       file.endsWith(".graphql") ||
       file.endsWith(".gql") ||

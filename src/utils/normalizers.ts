@@ -24,7 +24,7 @@ export function safeName(base: string, used: Set<string>) {
 
 export function mkName(operationId?: string, method?: string, path?: string) {
   if (operationId) return operationId;
-  const clean = (path || "").replace(/[\/{}]/g, " ").trim();
+  const clean = (path || "").replace(/[/{}]/g, " ").trim();
   const parts = `${method} ${clean}`.split(/\s+/).filter(Boolean);
   return parts
     .map((w, i) =>

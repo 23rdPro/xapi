@@ -112,7 +112,7 @@ export async function generateClient(
         `    const err = new Error(\`HTTP \${res.status}\`) as ApiError;`
       );
       lines.push(`    err.status = res.status;`);
-      lines.push(`    try { err.body = await res.json(); } catch {}`);
+      lines.push(`    try { err.body = await res.json(); } catch { /* ignore non-JSON body */ }`);
       lines.push(`    throw err;`);
       lines.push(`  }`);
       lines.push(`  return (await res.json()) as T;`);

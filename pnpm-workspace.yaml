@@ -1,0 +1,2 @@
+overrides:
+  global: link:../../AppData/Roaming/pnpm/global/5/node_modules/global

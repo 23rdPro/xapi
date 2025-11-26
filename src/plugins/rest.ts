@@ -7,7 +7,7 @@ import parseOpenAPISchema from "parsers/openapi";
 
 export const restPlugin: CodegenPlugin = {
   name: "rest",
-  match(file, options?) {
+  match(file) {
     return (
       file.endsWith(".yaml") || file.endsWith(".json") || file.endsWith(".yml")
     );

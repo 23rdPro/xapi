@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { pathToFileURL } from "url";
 import { z } from "zod";
 
 const ConfigSchema = z.object({
@@ -11,13 +12,14 @@ const ConfigSchema = z.object({
 
 export type XapiConfig = z.infer<typeof ConfigSchema>;
 
-export function loadConfig(cwd = process.cwd()): XapiConfig {
+export async function loadConfig(cwd = process.cwd()): Promise<XapiConfig> {
   // 1. Try xapi.config.ts/js
   const configPath = ["xapi.config.ts", "xapi.config.js"]
     .map((f) => path.join(cwd, f))
     .find(fs.existsSync);
   if (configPath) {
-    const mod = require(configPath);
+    // ESM import - use dynamic import for config files (convert path to file:// URL)
+    const mod = await import(pathToFileURL(configPath).href);
     const cfg = mod.default || mod;
     return ConfigSchema.parse(cfg);
   }
