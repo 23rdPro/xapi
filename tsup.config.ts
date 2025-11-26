@@ -7,7 +7,7 @@ export default defineConfig({
   banner: { js: "#!/usr/bin/env node" },
   platform: "node",
   splitting: false,
-  sourcemap: false,
+  sourcemap: true,
   clean: true,
   outDir: "dist",
   external: ["yaml"],

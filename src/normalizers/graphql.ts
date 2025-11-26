@@ -4,41 +4,39 @@ import type { GraphQLEndpoint } from "types/endpoint";
 export function normalizeGraphQLSchema(
   schema: GraphQLSchema
 ): GraphQLEndpoint[] {
-  const typeMap = schema.getTypeMap();
   const endpoints: GraphQLEndpoint[] = [];
 
-  const queryType = schema.getQueryType();
-  if (queryType) {
-    const fields = queryType.getFields();
-    for (const [name] of Object.entries(fields)) {
-      endpoints.push({
-        operationType: "query",
-        operationName: name,
-        rawDocument: `query ${name} { ${name} }`,
-      });
-    }
-  }
+  const types = [
+    { type: schema.getQueryType(), kind: "query" as const },
+    { type: schema.getMutationType(), kind: "mutation" as const },
+    { type: schema.getSubscriptionType(), kind: "subscription" as const },
+  ];
 
-  const mutationType = schema.getMutationType();
-  if (mutationType) {
-    const fields = mutationType.getFields();
-    for (const [name] of Object.entries(fields)) {
+  for (const { type, kind } of types) {
+    if (!type) continue;
+    const fields = type.getFields();
+    for (const [name, field] of Object.entries(fields)) {
       endpoints.push({
-        operationType: "mutation",
+        name,
+        operationId: name,
+        method: "POST", // all GraphQL go to /graphql
+        path: "/graphql",
+        operationType: kind,
         operationName: name,
-        rawDocument: `mutation ${name} { ${name} }`,
-      });
-    }
-  }
-
-  const subscriptionType = schema.getSubscriptionType();
-  if (subscriptionType) {
-    const fields = subscriptionType.getFields();
-    for (const [name] of Object.entries(fields)) {
-      endpoints.push({
-        operationType: "subscription",
-        operationName: name,
-        rawDocument: `subscription ${name} { ${name} }`,
+        graphql: {
+          kind,
+          field: name,
+        },
+        requestSchema: field.args,
+        responseSchema: field.type,
+        request: {
+          type: "object",
+          schema: field.args ?? [],
+        },
+        response: {
+          type: field.type?.toString() ?? "any",
+          schema: field.type,
+        },
       });
     }
   }

@@ -6,15 +6,13 @@ import { normalizeOpenAPISchema } from "normalizers/openapi";
 import parseOpenAPISchema from "parsers/openapi";
 
 export const restPlugin: CodegenPlugin = {
-  name: "rest-openapi",
+  name: "rest",
   match(file, options?) {
     return (
       file.endsWith(".yaml") || file.endsWith(".json") || file.endsWith(".yml")
     );
   },
   async run(schemaPath, options) {
-    console.log("restPlugin.run received options:", options);
-
     const outDir = options?.outDir ?? "src/generated";
     const baseUrl = options?.baseUrl ?? "";
     const httpLibrary = options?.httpLibrary ?? "fetch";

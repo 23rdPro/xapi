@@ -31,6 +31,23 @@ export type GraphQLEndpoint = {
   requestSchema?: any;
   responseSchema?: any;
   rawDocument?: string;
+
+  name: string;
+  operationId: string;
+  method: string;
+  path: string;
+  graphql: {
+    kind: "query" | "mutation" | "subscription";
+    field: string;
+  };
+  request?: {
+    type: string;
+    schema: any;
+  };
+  response?: {
+    type: string;
+    schema: any;
+  };
 };
 
 export type Endpoint = {

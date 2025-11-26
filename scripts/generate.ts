@@ -7,6 +7,7 @@ import { withSpinner } from "utils/spinner";
 import { fileURLToPath } from "url";
 import path from "path";
 import { generatePlugin } from "plugins/generate";
+import chalk from "chalk";
 
 const LIB_MAP: Record<
   Exclude<ClientGenOptions["httpLibrary"], undefined>,
@@ -50,34 +51,43 @@ export function ensureHttpLibInstalled(
 }
 export { main };
 
-async function main() {
+async function main(
+  schemaPath?: string,
+  httpLib?: Exclude<ClientGenOptions["httpLibrary"], undefined>
+) {
   const args = process.argv.slice(2);
 
-  let schemaPath = "./openapi.yaml";
-  let command = "generate";
+  const first = args[0];
+  const isSchemaFile = /\.(json|yaml|yml|graphql|gql)$/i.test(first);
 
-  if (args.length > 0) {
-    const first = args[0];
+  let command = isSchemaFile ? "generate" : first;
+  schemaPath = schemaPath ?? (isSchemaFile ? first : args[1]);
 
-    // If first arg looks like a file → treat it as schema
-    if (/\.(json|yaml|yml)$/i.test(first)) {
-      schemaPath = first;
-    } else {
-      // otherwise treat as a command
-      command = first;
-      schemaPath = args[1] || schemaPath;
-    }
+  if (!schemaPath) {
+    console.log("⚠ No schema provided, using default openapi.yaml");
+    schemaPath = "./openapi.yaml";
   }
 
-  const rawLib =
-    (/\.(json|yaml|yml|graphql|gql)$/i.test(args[0]) ? args[1] : args[2]) ??
-    undefined;
+  const rawLib = (isSchemaFile ? args[1] : args[2]) ?? undefined;
+  const httpLibRaw = (rawLib ?? httpLib ?? "fetch").toLowerCase();
+  const allowedLibs = ["fetch", "axios", "rtk", "tanstack"] as const;
 
-  const httpLib: Exclude<ClientGenOptions["httpLibrary"], undefined> =
-    (rawLib as any) || "fetch";
+  type HttpLibType = (typeof allowedLibs)[number];
+
+  if (!allowedLibs.includes(httpLibRaw as HttpLibType)) {
+    console.error(
+      chalk.red(
+        `❌ Invalid client "${httpLibRaw}". Expected one of: ${allowedLibs.join(
+          ", "
+        )}`
+      )
+    );
+    process.exit(1);
+  }
+  httpLib = httpLibRaw as HttpLibType;
 
   await withSpinner("Checking dependencies...", async () => {
-    ensureHttpLibInstalled(httpLib);
+    ensureHttpLibInstalled(httpLib as HttpLibType);
   });
 
   if (command === "generate") {

@@ -7,29 +7,30 @@ on:
     branches: [dev]
 
 jobs:
-  install-deps:
+  install-and-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
-      - uses: actions/setup-node@v3
+          version: 10
+      - uses: actions/setup-node@v4
         with:
-          node-version:
+          node-version: "20"
           cache: "pnpm"
       - run: pnpm install
-
-  lint:
-    needs: install-deps
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
       - run: pnpm run lint
 
   test:
-    needs: install-deps
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - run: pnpm install
       - run: pnpm run test
