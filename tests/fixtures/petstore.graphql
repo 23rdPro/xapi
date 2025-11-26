@@ -1,0 +1,17 @@
+type Pet {
+  id: ID!
+  name: String!
+  color: String
+}
+
+type Query {
+  allPets: [Pet]!
+}
+
+type Mutation {
+  createPet(name: String!, color: String): Pet
+}
+
+type Subscription {
+  petCreated: Pet
+}

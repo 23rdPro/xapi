@@ -1,0 +1,7 @@
+{
+  "schema": "./openapi.yaml",
+  "outDir": "src/generated",
+  "baseUrl": "https://api.example.com",
+  "httpLibrary": "fetch",
+  "zod": true
+}

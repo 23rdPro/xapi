@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "baseUrl": "./src",
+    "paths": {
+      "utils/*": ["utils/*"],
+      "loaders/*": ["loaders/*"],
+      "generators/*": ["generators/*"],
+      "normalizers/*": ["normalizers/*"],
+      "parsers/*": ["parsers/*"],
+      "types/*": ["types/*"],
+      "scripts/*": ["scripts/*"],
+      "core/*": ["core/*"],
+      "plugins/*": ["plugins/*"],
+    }
+  },
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist", ".husky"]
+}
