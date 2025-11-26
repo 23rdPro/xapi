@@ -205,7 +205,7 @@ export async function generateClient(
       lines.push(
         `export async function ${funcName}(${bodyArg}): Promise<${respType}> {`
       );
-      let pathExpr = "`" + ep.path.replace(/{(.*?)}/g, "${params.$1}") + "`";
+      const pathExpr = "`" + ep.path.replace(/{(.*?)}/g, "${params.$1}") + "`";
       lines.push(`  return client.request<${respType}>({`);
       lines.push(`    method: "${ep.method}",`);
       lines.push(`    path: ${pathExpr},`);

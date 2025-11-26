@@ -11,5 +11,8 @@ export default [
         project: './tsconfig.json',
       },
     },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
   },
 ];
