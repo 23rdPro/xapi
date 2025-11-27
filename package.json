@@ -67,7 +67,10 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md",
+    "examples.js",
+    "cli-examples.js"
   ],
   "types": "dist/index.d.ts",
   "peerDependencies": {

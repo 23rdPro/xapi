@@ -9,6 +9,70 @@
 - **REST APIs** → `fetch`, `axios`, `RTK Query`, `TanStack Query`
 - **GraphQL APIs** → Operations-based clients with subscription support
 
+## 📖 Quick Start
+
+### Installation
+
+```bash
+npm install @23rdpro/xapi
+# or
+pnpm add @23rdpro/xapi
+```
+
+### Basic Usage (CLI)
+
+Generate a fetch client from an OpenAPI spec:
+
+```bash
+xapi generate ./openapi.yaml fetch --zod --out src/generated
+```
+
+Create a config file:
+
+```bash
+xapi init
+xapi generate
+```
+
+### Usage Examples
+
+#### Programmatic Examples
+
+See **[`examples.js`](./examples.js)** for comprehensive examples demonstrating:
+
+- ✅ Generating fetch, axios, RTK, and TanStack clients
+- ✅ Working with GraphQL schemas and subscriptions
+- ✅ Using Zod validators for runtime validation
+- ✅ Programmatic API for integration
+- ✅ Custom naming prefixes
+
+**Run programmatic examples:**
+
+```bash
+node examples.js
+```
+
+This generates sample clients from the included Petstore fixtures.
+
+#### CLI Examples
+
+See **[`cli-examples.js`](./cli-examples.js)** for real-world CLI command examples demonstrating:
+
+- ✅ Installation via npm/pnpm
+- ✅ Generating clients for different HTTP libraries
+- ✅ Configuration file setup
+- ✅ Common workflows and patterns
+- ✅ CI/CD integration
+- ✅ Using generated clients in applications
+
+**Run CLI examples:**
+
+```bash
+node cli-examples.js
+```
+
+This will execute actual `xapi generate` commands and show you the workflows.
+
 ## 🏗️ Architecture
 
 ### Core Flow: Plugin System
