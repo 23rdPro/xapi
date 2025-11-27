@@ -3,252 +3,226 @@
 /**
  * xAPI Usage Examples
  *
- * This file demonstrates how to use @23rdpro/xapi to generate
+ * This file demonstrates how to use @23rdpro/xapi via the CLI to generate
  * type-safe API clients from OpenAPI and GraphQL schemas.
+ *
+ * Note: This file is included in the npm package as a reference.
+ * It shows the primary way to use xAPI: through the command-line interface.
+ *
+ * Install the package first:
+ *   npm install @23rdpro/xapi
+ *
+ * Then run this file to see the examples:
+ *   node examples.js
  *
  * Examples include:
  * - Generating REST clients (fetch, axios, RTK, TanStack)
  * - Generating GraphQL clients with subscriptions
- * - Working with the programmatic API
  * - Using Zod validators for runtime validation
+ * - Integration with your project
  */
 
-import { generateClient, generateGraphQLClient } from './dist/client.js';
-import { generateTypes, generateGraphQLTypes } from './dist/generators/typescript.js';
-import { parseOpenAPISchema } from './dist/parsers/openapi.js';
-import { normalizeOpenAPISchema } from './dist/normalizers/openapi.js';
-import { loadOpenAPISchema } from './dist/loaders/openapi.js';
-import { loadGraphQLSchema } from './dist/loaders/graphql.js';
-import { normalizeGraphQLSchema } from './dist/normalizers/graphql.js';
+import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const fixturesDir = './tests/fixtures';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/**
- * Example 1: Generate a fetch-based REST client from OpenAPI
- *
- * This example loads the Petstore OpenAPI schema, parses it,
- * normalizes endpoints, generates TypeScript types, and creates
- * a fetch-based HTTP client.
- */
-async function example1_FetchClient() {
-  console.log('\n📘 Example 1: Fetch-based REST Client\n');
-  
-  try {
-    // Load the Petstore OpenAPI spec (YAML)
-    const spec = await loadOpenAPISchema(path.join(fixturesDir, 'petstore.yaml'));
-    
-    // Parse and validate the schema
-    const parsed = await parseOpenAPISchema(spec);
-    
-    // Normalize to uniform endpoint format
-    const endpoints = normalizeOpenAPISchema(parsed);
-    
-    console.log(`✓ Loaded ${endpoints.length} API endpoints from Petstore`);
-    
-    // Generate TypeScript types
-    const types = await generateTypes(endpoints, {
-      outputPath: './examples/petstore-types.ts',
-      zod: false,
+// Helper to run shell commands
+function runCommand(command, args = [], description = '') {
+  return new Promise((resolve, reject) => {
+    console.log(`\n${'─'.repeat(70)}`);
+    if (description) console.log(`📌 ${description}`);
+    console.log(`$ ${command} ${args.join(' ')}`);
+    console.log('─'.repeat(70));
+
+    const proc = spawn(command, args, {
+      stdio: 'inherit',
+      shell: true,
+      cwd: __dirname,
     });
-    console.log('✓ Generated TypeScript types');
-    
-    // Generate fetch client
-    const client = await generateClient(endpoints, {
-      outputPath: './examples/petstore-client-fetch.ts',
-      httpLibrary: 'fetch',
-      baseUrl: 'https://petstore.swagger.io/v2',
+
+    proc.on('close', (code) => {
+      if (code !== 0 && code !== 1) {
+        console.log(`\n⚠️  Command exited with code ${code}`);
+      }
+      resolve(code);
     });
-    console.log('✓ Generated fetch client');
-    console.log(`\nClient preview (first 300 chars):\n${client.substring(0, 300)}...\n`);
-    
-  } catch (err) {
-    console.error('❌ Example 1 failed:', err.message);
-  }
+
+    proc.on('error', (err) => {
+      console.error(`❌ Failed to run: ${err.message}`);
+      reject(err);
+    });
+  });
 }
 
-/**
- * Example 2: Generate an axios client with Zod validation
- *
- * Uses Zod for runtime schema validation. The generated client
- * includes both TypeScript types and Zod validators.
- */
-async function example2_AxiosWithZod() {
-  console.log('\n📘 Example 2: Axios Client with Zod Validation\n');
-  
-  try {
-    const spec = await loadOpenAPISchema(path.join(fixturesDir, 'petstore.json'));
-    const parsed = await parseOpenAPISchema(spec);
-    const endpoints = normalizeOpenAPISchema(parsed);
-    
-    // Generate types with Zod validators
-    const types = await generateTypes(endpoints, {
-      outputPath: './examples/petstore-types-zod.ts',
-      zod: true,
-      prefix: 'Pet',
-    });
-    console.log('✓ Generated TypeScript types with Zod schemas');
-    
-    // Generate axios client
-    const client = await generateClient(endpoints, {
-      outputPath: './examples/petstore-client-axios.ts',
-      httpLibrary: 'axios',
-      baseUrl: 'https://petstore.swagger.io/v2',
-      zod: true,
-    });
-    console.log('✓ Generated axios client with Zod validation\n');
-    
-  } catch (err) {
-    console.error('❌ Example 2 failed:', err.message);
-  }
-}
-
-/**
- * Example 3: Generate RTK Query hooks
- *
- * RTK Query is Redux Toolkit's data fetching & caching library.
- * Perfect for React apps with Redux.
- */
-async function example3_RTKQuery() {
-  console.log('\n📘 Example 3: RTK Query Hooks\n');
-  
-  try {
-    const spec = await loadOpenAPISchema(path.join(fixturesDir, 'petstore.yaml'));
-    const parsed = await parseOpenAPISchema(spec);
-    const endpoints = normalizeOpenAPISchema(parsed);
-    
-    const client = await generateClient(endpoints, {
-      outputPath: './examples/petstore-client-rtk.ts',
-      httpLibrary: 'rtk',
-      baseUrl: 'https://petstore.swagger.io/v2',
-    });
-    console.log('✓ Generated RTK Query API slice');
-    console.log(`\nRTK client preview (first 300 chars):\n${client.substring(0, 300)}...\n`);
-    
-  } catch (err) {
-    console.error('❌ Example 3 failed:', err.message);
-  }
-}
-
-/**
- * Example 4: Generate TanStack Query (React Query) hooks
- *
- * TanStack Query (aka React Query) is a powerful data sync library
- * for React. Perfect for modern React applications.
- */
-async function example4_TanStackQuery() {
-  console.log('\n📘 Example 4: TanStack Query Hooks\n');
-  
-  try {
-    const spec = await loadOpenAPISchema(path.join(fixturesDir, 'petstore.json'));
-    const parsed = await parseOpenAPISchema(spec);
-    const endpoints = normalizeOpenAPISchema(parsed);
-    
-    const client = await generateClient(endpoints, {
-      outputPath: './examples/petstore-client-tanstack.ts',
-      httpLibrary: 'tanstack',
-      baseUrl: 'https://petstore.swagger.io/v2',
-    });
-    console.log('✓ Generated TanStack Query hooks\n');
-    
-  } catch (err) {
-    console.error('❌ Example 4 failed:', err.message);
-  }
-}
-
-/**
- * Example 5: Generate a GraphQL client
- *
- * Generates a typed GraphQL client with support for queries,
- * mutations, and subscriptions. Includes WebSocket support.
- */
-async function example5_GraphQLClient() {
-  console.log('\n📘 Example 5: GraphQL Client\n');
-  
-  try {
-    // Load GraphQL schema
-    const schema = await loadGraphQLSchema(path.join(fixturesDir, 'petstore.graphql'));
-    
-    // Normalize to endpoints
-    const endpoints = normalizeGraphQLSchema(schema);
-    
-    console.log(`✓ Loaded ${endpoints.length} GraphQL operations`);
-    
-    // Generate GraphQL types
-    const types = await generateGraphQLTypes(endpoints, {
-      outputPath: './examples/petstore-graphql-types.ts',
-      zod: true,
-      prefix: 'GQL',
-    });
-    console.log('✓ Generated GraphQL types');
-    
-    // Generate GraphQL client
-    const client = await generateGraphQLClient(endpoints, {
-      outputPath: './examples/petstore-graphql-client.ts',
-      baseUrl: 'https://api.example.com/graphql',
-      wsUrl: 'wss://api.example.com/graphql',
-      zod: true,
-    });
-    console.log('✓ Generated GraphQL client with subscription support\n');
-    
-  } catch (err) {
-    console.error('❌ Example 5 failed:', err.message);
-  }
-}
-
-/**
- * Example 6: Programmatic API - Full workflow
- *
- * Demonstrates the complete pipeline: load → parse → normalize → generate
- * for both REST and GraphQL.
- */
-async function example6_ProgrammaticAPI() {
-  console.log('\n📘 Example 6: Complete Programmatic Workflow\n');
-  
-  try {
-    // REST workflow
-    console.log('REST API:');
-    const restSpec = await loadOpenAPISchema(path.join(fixturesDir, 'petstore.json'));
-    const restParsed = await parseOpenAPISchema(restSpec);
-    const restEndpoints = normalizeOpenAPISchema(restParsed);
-    console.log(`  - Loaded and processed ${restEndpoints.length} endpoints`);
-    
-    // GraphQL workflow
-    console.log('GraphQL API:');
-    const gqlSchema = await loadGraphQLSchema(path.join(fixturesDir, 'petstore.graphql'));
-    const gqlEndpoints = normalizeGraphQLSchema(gqlSchema);
-    console.log(`  - Loaded and processed ${gqlEndpoints.length} operations\n`);
-    
-  } catch (err) {
-    console.error('❌ Example 6 failed:', err.message);
-  }
-}
-
-/**
- * Main: Run all examples
- */
 async function main() {
-  console.log('═════════════════════════════════════════════════════');
-  console.log('  @23rdpro/xapi - Usage Examples');
-  console.log('  Type-Safe API Client Generator');
-  console.log('═════════════════════════════════════════════════════');
-  
-  // Ensure output directory exists
-  await fs.mkdir('./examples', { recursive: true }).catch(() => {});
-  
-  // Run examples
-  await example1_FetchClient();
-  await example2_AxiosWithZod();
-  await example3_RTKQuery();
-  await example4_TanStackQuery();
-  await example5_GraphQLClient();
-  await example6_ProgrammaticAPI();
-  
-  console.log('═════════════════════════════════════════════════════');
-  console.log('✅ All examples completed!');
-  console.log('\n📁 Generated files saved to ./examples/');
-  console.log('\n📖 For more info, see README.md\n');
+  console.log('\n');
+  console.log('╔═══════════════════════════════════════════════════════════════════════╗');
+  console.log('║                 @23rdpro/xapi - Usage Examples                        ║');
+  console.log('║                                                                       ║');
+  console.log('║              Type-Safe API Client Generator for TypeScript            ║');
+  console.log('╚═══════════════════════════════════════════════════════════════════════╝');
+  console.log();
+
+  // Example 1: Fetch client from OpenAPI YAML
+  await runCommand(
+    'npx',
+    ['@23rdpro/xapi', 'generate', './tests/fixtures/petstore.yaml', 'fetch', '--out', 'src/generated-example-1'],
+    'Example 1: Generate fetch client from OpenAPI (YAML)'
+  );
+
+  // Example 2: Axios client with Zod validation
+  await runCommand(
+    'npx',
+    ['@23rdpro/xapi', 'generate', './tests/fixtures/petstore.json', 'axios', '--zod', '--out', 'src/generated-example-2'],
+    'Example 2: Generate axios client with Zod validators (JSON)'
+  );
+
+  // Example 3: RTK Query hooks
+  await runCommand(
+    'npx',
+    ['@23rdpro/xapi', 'generate', './tests/fixtures/petstore.yaml', 'rtk', '--out', 'src/generated-example-3'],
+    'Example 3: Generate RTK Query hooks (for React + Redux)'
+  );
+
+  // Example 4: TanStack Query hooks
+  await runCommand(
+    'npx',
+    ['@23rdpro/xapi', 'generate', './tests/fixtures/petstore.yaml', 'tanstack', '--out', 'src/generated-example-4'],
+    'Example 4: Generate TanStack Query hooks (for modern React)'
+  );
+
+  // Example 5: GraphQL client
+  await runCommand(
+    'npx',
+    ['@23rdpro/xapi', 'generate', './tests/fixtures/petstore.graphql', 'fetch', '--out', 'src/generated-example-5'],
+    'Example 5: Generate GraphQL client with subscription support'
+  );
+
+  // Example 6: Using configuration file
+  console.log('\n' + '='.repeat(70));
+  console.log('📌 Example 6: Using a configuration file');
+  console.log('='.repeat(70));
+  console.log(`
+Instead of passing all options on the CLI, you can create an xapi.config.json:
+
+{
+  "schema": "./specs/openapi.yaml",
+  "httpLibrary": "fetch",
+  "outDir": "src/generated",
+  "baseUrl": "https://api.example.com",
+  "zod": true,
+  "prefix": "API"
 }
 
-main().catch(console.error);
+Then simply run:
+$ npx @23rdpro/xapi generate
+
+xAPI will automatically use the configuration.
+  `);
+
+  // Example 7: Real-world usage
+  console.log('\n' + '='.repeat(70));
+  console.log('📌 Example 7: Using generated client in your code');
+  console.log('='.repeat(70));
+  console.log(`
+After generating with: xapi generate ./openapi.yaml fetch --out src/api
+
+In your TypeScript/JavaScript:
+
+import { createClient } from './src/api'
+import type { Pet, PetStatus } from './src/api/types'
+
+async function main() {
+  const client = createClient({
+    baseUrl: 'https://petstore.api.com',
+  })
+
+  // List all pets
+  const pets = await client.listPets({ limit: 10 })
+  console.log('Pets:', pets)
+
+  // Create a new pet
+  const newPet = await client.createPet({
+    name: 'Fluffy',
+    status: 'available',
+  })
+
+  // Get pet by ID
+  const pet = await client.getPet({ petId: newPet.id })
+  
+  // Update pet
+  await client.updatePet({
+    petId: pet.id,
+    name: 'Updated Fluffy',
+    status: 'sold',
+  })
+}
+
+main().catch(console.error)
+  `);
+
+  // Show output structure
+  console.log('\n' + '='.repeat(70));
+  console.log('📋 Generated Files Structure');
+  console.log('='.repeat(70));
+  console.log(`
+Each generation creates:
+
+src/generated/
+├── index.ts              # Main export
+├── types.ts              # All TypeScript types
+├── client.ts             # HTTP client
+├── validators.ts         # Zod schemas (if --zod used)
+└── endpoints.ts          # Endpoint definitions
+
+Key exports from index.ts:
+  - createClient()        - Initialize HTTP client
+  - getEndpoints()        - Get endpoint metadata
+  - createValidator()     - Runtime type validation
+  `);
+
+  // Clean up examples
+  console.log('\n🧹 Cleaning up example outputs...\n');
+  const exampleDirs = [
+    'src/generated-example-1',
+    'src/generated-example-2',
+    'src/generated-example-3',
+    'src/generated-example-4',
+    'src/generated-example-5',
+  ];
+
+  for (const dir of exampleDirs) {
+    const fullPath = path.join(__dirname, dir);
+    try {
+      await fs.rm(fullPath, { recursive: true, force: true });
+      console.log(`✓ Removed ${dir}`);
+    } catch (_err) {
+      // Ignore cleanup errors
+    }
+  }
+
+  // Summary
+  console.log('\n' + '='.repeat(70));
+  console.log('✅ Examples Complete!');
+  console.log('='.repeat(70));
+  console.log(`
+📚 Learn more:
+  • README.md - Full documentation
+  • cli-examples.js - More CLI command examples
+  • GitHub - https://github.com/23rdPro/xapi
+
+🚀 Next steps:
+  1. Create your xapi.config.json
+  2. Run: npx @23rdpro/xapi generate
+  3. Import generated client in your code
+  4. Enjoy type safety!
+  `);
+}
+
+main().catch((err) => {
+  console.error('Error:', err);
+  process.exit(1);
+});
