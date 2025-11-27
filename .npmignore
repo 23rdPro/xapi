@@ -1,0 +1,13 @@
+src/
+tests/
+.gitlab-ci.yml
+.github/
+*.test.ts
+tsconfig.json
+vitest.config.ts
+eslint.config.js
+prettier.config.js
+xapi.config.json
+scripts/
+pnpm-lock.yaml
+node_modules/
