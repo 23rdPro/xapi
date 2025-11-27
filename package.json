@@ -1,6 +1,6 @@
 {
   "name": "@23rdpro/xapi",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Open-source TypeScript SDK for working with the xAPI standard.",
   "main": "dist/index.js",
   "type": "module",
